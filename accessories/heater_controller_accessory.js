@@ -4,7 +4,7 @@ var Service = require('../').Service;
 var Characteristic = require('../').Characteristic;
 var uuid = require('../').uuid;
 // Raspberry Pi GPIO access dependencies
-var wpi = require('wiring-pi');
+var gpio = require('rpi-gpio');
 
 /** ************************ **/
 /** Hardware interface       **/
@@ -15,16 +15,18 @@ var HEATER = {
   initialise: function(pinNum) {
     console.log("Initialising Raspbery PI Heater HomeKit Interface");
     // Set up the pin numbering format we're going to use
-    wpi.setup('wpi');
+    gpio.setMode(gpio.MODE_RPI);
     // Set up the GPIO pin
     HEATER.gpioPin = pinNum;
-    wpi.pinMode(gpioPin, wpi.OUTPUT);
+    gpio.setup(HEATER.gpioPin, gpio.DIR_OUT);
     // Make sure it's off to start off with
     HEATER.setPowerOn(false);
   }
   setPowerOn: function(on) {
     console.log("Turning the heater %s", on ? "on" : "off");
-    wpi.digitalWrite(gpioPin, on ? 1 : 0);
+    gpio.write(HEATER.gpioPin, on, function(err) {
+      if (err) throw err;
+    });
     HEATER.powerOn = on;
   }
   identify: function() {
@@ -39,7 +41,13 @@ var HEATER = {
 /** ************************ **/
 /** HomeKit Service Setup    **/
 /** ************************ **/
-
+// Initialise the hardware
+var pinArg = process.argv[2];
+if isNaN(pinArg) {
+  console.error("Expected usage: node Core.js <heater Raspberry Pi GPIO pin number>");
+  return new Error("Invalid pin number specified: %s", pinArg);
+}
+HEATER.initialise(pinArg);
 // Create the heater identifier
 var heaterUUID = uuid.generate('hap-nodejs:accessories:'+'Heater');
 // Create the accessory
